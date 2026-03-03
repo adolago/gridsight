@@ -158,8 +158,15 @@ jobs:
           test -n "$DMZ_SSH_USER"
 
           RSYNC_SSH="ssh -i ~/.ssh/id_dmz -p $DEPLOY_PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ProxyJump=none -o ProxyCommand=none"
+          SSH_PRECHECK="ssh -i ~/.ssh/id_dmz -p $DEPLOY_PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ProxyJump=none -o ProxyCommand=none"
 
-          rsync -az --delete --timeout=120 \
+          if ! $SSH_PRECHECK "$DMZ_SSH_USER@$DEPLOY_HOST" "echo ssh-preflight-ok"; then
+            echo "SSH preflight failed."
+            cat /tmp/cloudflared-access.log || true
+            exit 1
+          fi
+
+          if ! rsync -az --delete --timeout=120 \
             --filter='P .env' \
             --filter='P data/' \
             --filter='P cloudflared/' \
@@ -174,7 +181,11 @@ jobs:
             --exclude 'cloudflared/' \
             --exclude '.learnings/' \
             -e "$RSYNC_SSH" \
-            ./ "$DMZ_SSH_USER@$DEPLOY_HOST:$APP_DIR/"
+            ./ "$DMZ_SSH_USER@$DEPLOY_HOST:$APP_DIR/"; then
+            echo "Rsync failed."
+            cat /tmp/cloudflared-access.log || true
+            exit 1
+          fi
 
       - name: Run remote deploy script
         env:
