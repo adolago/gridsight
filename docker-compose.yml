@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: gridsight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gridsight}
+      POSTGRES_USER: ${POSTGRES_USER:-gridsight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gridsight}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - gridsight_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gridsight} -d ${POSTGRES_DB:-gridsight}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: gridsight-qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - gridsight_qdrant_data:/qdrant/storage
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gridsight-api
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - qdrant
+    environment:
+      GRIDSIGHT_DATABASE_URL: ${GRIDSIGHT_DATABASE_URL:-postgresql+psycopg://gridsight:gridsight@postgres:5432/gridsight}
+      GRIDSIGHT_QDRANT_URL: ${GRIDSIGHT_QDRANT_URL:-http://qdrant:6333}
+      GRIDSIGHT_QDRANT_COLLECTION: ${GRIDSIGHT_QDRANT_COLLECTION:-plays}
+      GRIDSIGHT_QDRANT_API_KEY: ${GRIDSIGHT_QDRANT_API_KEY:-}
+      GRIDSIGHT_DATA_DIR: /app/data
+    ports:
+      - "127.0.0.1:${GRIDSIGHT_API_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  gridsight_postgres_data:
+  gridsight_qdrant_data:

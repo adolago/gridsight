@@ -1,0 +1,19 @@
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.pyc
+*.egg-info/
+.env
+.learnings/
+
+# Local data artifacts
+data/raw/*.parquet
+data/processed/*.parquet
+data/models/*.joblib
+data/vector_db/
+data/*.db
+
+# IDE
+.vscode/
+.idea/

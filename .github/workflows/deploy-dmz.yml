@@ -1,0 +1,178 @@
+name: Deploy Remote
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dmz
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    env:
+      APP_DIR: /opt/docker/gridsight
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install runtime tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends openssh-client rsync curl
+
+      - name: Install cloudflared (for optional Access mode)
+        run: |
+          curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" -o cloudflared
+          chmod +x cloudflared
+          sudo mv cloudflared /usr/local/bin/cloudflared
+          cloudflared --version
+
+      - name: Configure SSH key
+        env:
+          DMZ_SSH_PRIVATE_KEY: ${{ secrets.DMZ_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$DMZ_SSH_PRIVATE_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DMZ_SSH_PRIVATE_KEY" > ~/.ssh/id_dmz
+          chmod 600 ~/.ssh/id_dmz
+
+      - name: Enforce isolation target policy
+        env:
+          DMZ_SSH_HOST: ${{ secrets.DMZ_SSH_HOST }}
+          DMZ_SSH_USER: ${{ secrets.DMZ_SSH_USER }}
+        run: |
+          test -n "$DMZ_SSH_HOST"
+          test -n "$DMZ_SSH_USER"
+
+          if [[ "$DMZ_SSH_USER" == "root" ]]; then
+            echo "Refusing deploy as root user."
+            exit 1
+          fi
+
+          if [[ "$DMZ_SSH_HOST" =~ ^(jump-host|localhost|127\.) ]]; then
+            echo "Refusing internal/jump-host target: $DMZ_SSH_HOST"
+            exit 1
+          fi
+
+          if [[ "$DMZ_SSH_HOST" =~ ^10\. ]] || \
+             [[ "$DMZ_SSH_HOST" =~ ^192\.168\. ]] || \
+             [[ "$DMZ_SSH_HOST" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
+            echo "Refusing private RFC1918 target: $DMZ_SSH_HOST"
+            exit 1
+          fi
+
+      - name: Resolve target endpoint
+        env:
+          DMZ_SSH_HOST: ${{ secrets.DMZ_SSH_HOST }}
+          DMZ_SSH_PORT: ${{ secrets.DMZ_SSH_PORT }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CF_ACCESS_CERT_PEM: ${{ secrets.CF_ACCESS_CERT_PEM }}
+        run: |
+          test -n "$DMZ_SSH_HOST"
+
+          if [[ -n "$CF_ACCESS_CLIENT_ID" && -n "$CF_ACCESS_CLIENT_SECRET" ]]; then
+            echo "Using Cloudflare Access TCP mode"
+            cloudflared access tcp \
+              --hostname "$DMZ_SSH_HOST" \
+              --url 127.0.0.1:2222 \
+              --header "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              --header "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              >/tmp/cloudflared-access.log 2>&1 &
+
+            for _ in $(seq 1 30); do
+              if (echo > /dev/tcp/127.0.0.1/2222) >/dev/null 2>&1; then
+                break
+              fi
+              sleep 1
+            done
+
+            echo "DEPLOY_HOST=127.0.0.1" >> "$GITHUB_ENV"
+            echo "DEPLOY_PORT=2222" >> "$GITHUB_ENV"
+          elif [[ -n "$CF_ACCESS_CERT_PEM" ]]; then
+            echo "Using Cloudflare Access TCP mode with Access cert"
+            mkdir -p ~/.cloudflared
+            chmod 700 ~/.cloudflared
+            printf '%s\n' "$CF_ACCESS_CERT_PEM" > ~/.cloudflared/cert.pem
+            chmod 600 ~/.cloudflared/cert.pem
+
+            cloudflared access tcp \
+              --hostname "$DMZ_SSH_HOST" \
+              --url 127.0.0.1:2222 \
+              >/tmp/cloudflared-access.log 2>&1 &
+
+            for _ in $(seq 1 30); do
+              if (echo > /dev/tcp/127.0.0.1/2222) >/dev/null 2>&1; then
+                break
+              fi
+              sleep 1
+            done
+
+            echo "DEPLOY_HOST=127.0.0.1" >> "$GITHUB_ENV"
+            echo "DEPLOY_PORT=2222" >> "$GITHUB_ENV"
+          else
+            echo "Using direct SSH mode"
+            echo "DEPLOY_HOST=$DMZ_SSH_HOST" >> "$GITHUB_ENV"
+            if [[ -n "$DMZ_SSH_PORT" ]]; then
+              echo "DEPLOY_PORT=$DMZ_SSH_PORT" >> "$GITHUB_ENV"
+            else
+              echo "DEPLOY_PORT=22" >> "$GITHUB_ENV"
+            fi
+          fi
+
+      - name: Configure known hosts
+        env:
+          DMZ_SSH_HOST_KEY: ${{ secrets.DMZ_SSH_HOST_KEY }}
+        run: |
+          if [[ -n "$DMZ_SSH_HOST_KEY" ]]; then
+            printf '%s\n' "$DMZ_SSH_HOST_KEY" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Sync repository to DMZ
+        env:
+          DMZ_SSH_USER: ${{ secrets.DMZ_SSH_USER }}
+        run: |
+          test -n "$DMZ_SSH_USER"
+
+          RSYNC_SSH="ssh -i ~/.ssh/id_dmz -p $DEPLOY_PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o ProxyJump=none -o ProxyCommand=none"
+
+          rsync -az --delete \
+            --filter='P .env' \
+            --filter='P data/' \
+            --filter='P cloudflared/' \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude '.pytest_cache' \
+            --exclude '.ruff_cache' \
+            --exclude '.env' \
+            --exclude 'data/' \
+            --exclude 'cloudflared/' \
+            --exclude '.learnings/' \
+            -e "$RSYNC_SSH" \
+            ./ "$DMZ_SSH_USER@$DEPLOY_HOST:$APP_DIR/"
+
+      - name: Run remote deploy script
+        env:
+          DMZ_SSH_USER: ${{ secrets.DMZ_SSH_USER }}
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/id_dmz -p $DEPLOY_PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o ProxyJump=none -o ProxyCommand=none"
+
+          $SSH_CMD "$DMZ_SSH_USER@$DEPLOY_HOST" "APP_DIR='$APP_DIR' bash '$APP_DIR/scripts/deploy_dmz.sh'"
+
+      - name: Report
+        run: |
+          echo "Deploy completed to $DEPLOY_HOST:$DEPLOY_PORT"
