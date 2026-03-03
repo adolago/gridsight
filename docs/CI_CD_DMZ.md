@@ -19,6 +19,7 @@ Optional:
 
 If service token secrets are set, workflow uses `cloudflared access tcp` and connects through Access.
 If not, workflow falls back to direct SSH.
+For headless CI, interactive Access login (browser flow) is not supported.
 
 ## 2. Edge VM requirements
 
