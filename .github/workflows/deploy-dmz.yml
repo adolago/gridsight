@@ -159,7 +159,7 @@ jobs:
 
           RSYNC_SSH="ssh -i ~/.ssh/id_dmz -p $DEPLOY_PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ProxyJump=none -o ProxyCommand=none"
 
-          rsync -az --delete --timeout=120 --contimeout=20 \
+          rsync -az --delete --timeout=120 \
             --filter='P .env' \
             --filter='P data/' \
             --filter='P cloudflared/' \
