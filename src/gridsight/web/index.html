@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GridSight Play Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-glow"></div>
+
+    <header class="hero">
+      <div>
+        <p class="kicker">GridSight</p>
+        <h1>Play Explorer</h1>
+        <p class="subhead">Filter every play in the database and inspect game context instantly.</p>
+      </div>
+      <a class="api-link" href="/docs" target="_blank" rel="noreferrer">API Docs</a>
+    </header>
+
+    <main class="layout">
+      <section class="panel filters-panel">
+        <h2>Filters</h2>
+        <form id="filters-form" class="filters-grid">
+          <label>
+            Season
+            <select id="season" name="season"></select>
+          </label>
+
+          <label>
+            Week
+            <select id="week" name="week"></select>
+          </label>
+
+          <label>
+            Offense Team
+            <select id="posteam" name="posteam"></select>
+          </label>
+
+          <label>
+            Defense Team
+            <select id="defteam" name="defteam"></select>
+          </label>
+
+          <label>
+            Play Type
+            <select id="play_type" name="play_type"></select>
+          </label>
+
+          <label>
+            Down
+            <select id="down" name="down"></select>
+          </label>
+
+          <label>
+            Game ID
+            <input id="game_id" name="game_id" type="text" placeholder="2024_01_KC_BAL" />
+          </label>
+
+          <label>
+            Description Contains
+            <input id="description_search" name="description_search" type="text" placeholder="touchdown" />
+          </label>
+
+          <label>
+            Yards To Go Min
+            <input id="ydstogo_min" name="ydstogo_min" type="number" step="0.1" />
+          </label>
+
+          <label>
+            Yards To Go Max
+            <input id="ydstogo_max" name="ydstogo_max" type="number" step="0.1" />
+          </label>
+
+          <label>
+            EPA Min
+            <input id="epa_min" name="epa_min" type="number" step="0.01" />
+          </label>
+
+          <label>
+            EPA Max
+            <input id="epa_max" name="epa_max" type="number" step="0.01" />
+          </label>
+
+          <label>
+            Sort By
+            <select id="sort_by" name="sort_by">
+              <option value="season">season</option>
+              <option value="week">week</option>
+              <option value="game_id">game_id</option>
+              <option value="play_id">play_id</option>
+              <option value="posteam">posteam</option>
+              <option value="defteam">defteam</option>
+              <option value="play_type">play_type</option>
+              <option value="down">down</option>
+              <option value="ydstogo">ydstogo</option>
+              <option value="yardline_100">yardline_100</option>
+              <option value="yards_gained">yards_gained</option>
+              <option value="epa">epa</option>
+              <option value="wpa">wpa</option>
+            </select>
+          </label>
+
+          <label>
+            Sort Direction
+            <select id="sort_dir" name="sort_dir">
+              <option value="desc">desc</option>
+              <option value="asc">asc</option>
+            </select>
+          </label>
+
+          <label>
+            Page Size
+            <select id="limit" name="limit">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </select>
+          </label>
+
+          <div class="actions">
+            <button id="apply-filters" type="submit">Apply</button>
+            <button id="reset-filters" type="button" class="secondary">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="results-top">
+          <h2>Plays</h2>
+          <div id="result-meta" class="meta">Loading...</div>
+        </div>
+
+        <div class="table-shell">
+          <table id="plays-table">
+            <thead>
+              <tr>
+                <th>Season</th>
+                <th>Week</th>
+                <th>Game</th>
+                <th>Play</th>
+                <th>Off</th>
+                <th>Def</th>
+                <th>Type</th>
+                <th>Down</th>
+                <th>ToGo</th>
+                <th>Gain</th>
+                <th>EPA</th>
+                <th>WPA</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody id="plays-body"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <button id="prev-page" type="button" class="secondary">Previous</button>
+          <span id="page-label">Page 1</span>
+          <button id="next-page" type="button" class="secondary">Next</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -47,7 +47,10 @@ gridsight db-bootstrap --drop-existing
 gridsight api --reload
 ```
 
-Open `http://localhost:8000/docs`.
+Open:
+
+- UI: `http://localhost:8000/`
+- API docs: `http://localhost:8000/docs`
 
 ## Docker Compose Stack
 
@@ -99,9 +102,12 @@ Setup guide: [docs/CI_CD_DMZ.md](docs/CI_CD_DMZ.md)
 
 ## API Endpoints
 
+- `GET /` (Play Explorer UI)
 - `GET /health`
 - `GET /v1/projections/{player_id}`
 - `POST /v1/similar-plays`
+- `GET /v1/plays/filter-options`
+- `GET /v1/plays` (filter + sort + pagination)
 
 ## Project Layout
 

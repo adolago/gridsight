@@ -41,5 +41,12 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+gridsight = [
+  "web/*.html",
+  "web/static/*.css",
+  "web/static/*.js"
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
