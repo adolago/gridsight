@@ -16,9 +16,9 @@ Optional:
 - `DMZ_SSH_HOST_KEY`: pinned host key line (recommended)
 - `CF_ACCESS_CLIENT_ID`: Cloudflare Access service token id (preferred)
 - `CF_ACCESS_CLIENT_SECRET`: Cloudflare Access service token secret (preferred)
-- `CF_ACCESS_CERT_PEM`: fallback Access cert (more privileged; use only if service token is unavailable)
 
-If service token or Access cert is set, workflow uses `cloudflared access tcp` and connects through Access.
+If service token secrets are set, workflow uses `cloudflared access tcp` and connects through Access.
+If not, workflow falls back to direct SSH.
 
 ## 2. Edge VM requirements
 

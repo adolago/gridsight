@@ -76,7 +76,6 @@ jobs:
           DMZ_SSH_PORT: ${{ secrets.DMZ_SSH_PORT }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-          CF_ACCESS_CERT_PEM: ${{ secrets.CF_ACCESS_CERT_PEM }}
         run: |
           test -n "$DMZ_SSH_HOST"
 
@@ -104,26 +103,6 @@ jobs:
 
             if ! wait_for_local_port 127.0.0.1 2222 30; then
               echo "Cloudflare Access TCP proxy did not become ready (service token mode)."
-              cat /tmp/cloudflared-access.log || true
-              exit 1
-            fi
-
-            echo "DEPLOY_HOST=127.0.0.1" >> "$GITHUB_ENV"
-            echo "DEPLOY_PORT=2222" >> "$GITHUB_ENV"
-          elif [[ -n "$CF_ACCESS_CERT_PEM" ]]; then
-            echo "Using Cloudflare Access TCP mode with Access cert"
-            mkdir -p ~/.cloudflared
-            chmod 700 ~/.cloudflared
-            printf '%s\n' "$CF_ACCESS_CERT_PEM" > ~/.cloudflared/cert.pem
-            chmod 600 ~/.cloudflared/cert.pem
-
-            cloudflared access tcp \
-              --hostname "$DMZ_SSH_HOST" \
-              --url 127.0.0.1:2222 \
-              >/tmp/cloudflared-access.log 2>&1 &
-
-            if ! wait_for_local_port 127.0.0.1 2222 30; then
-              echo "Cloudflare Access TCP proxy did not become ready (cert mode)."
               cat /tmp/cloudflared-access.log || true
               exit 1
             fi
